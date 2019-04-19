@@ -2,12 +2,57 @@ interface Material {
   nodes: { [s: string]: MatNode }
 }
 
-interface MatNode {
-  type: (x: number, y: number) => number
+interface NodeParams {
+  w: number
+  h: number
 }
 
-function Noise(x: number, y: number) {
-  return Math.random();
+interface MatNode {
+  func: (id: string, renderContext: RenderContext) => number[][]
+  data?: { [s: string]: any }
+}
+
+interface RenderContext {
+  mat: Material
+  nodeCache: { [s: string]: number[][] }
+  w: number
+  h: number
+}
+
+function Noise(id: string, renderContext: RenderContext) {
+  var output = [];
+  var node = renderContext.mat.nodes[id];
+
+  for (var y = 0; y < renderContext.h; y++) {
+    var row: number[] = [];
+    output.push(row);
+    for (var x = 0; x < renderContext.w; x++) {
+      row.push(Math.random());
+    }
+  }
+  return output;
+}
+
+function Levels(id: string, renderContext: RenderContext) {
+  var node = renderContext.mat.nodes[id];
+
+  var input = fetchNodeFromContext(node.data.input, renderContext);
+  var output = [];
+  for (var y = 0; y < renderContext.h; y++) {
+    var row: number[] = [];
+    output.push(row);
+    for (var x = 0; x < renderContext.w; x++) {
+      row.push(input[y][x] * 0.1);
+    }
+  }
+  return output;
+}
+
+function fetchNodeFromContext(id: string, renderContext: RenderContext) {
+  if (!renderContext.nodeCache[id]) {
+    renderContext.nodeCache[id] = renderContext.mat.nodes[id].func(id, renderContext);
+  }
+  return renderContext.nodeCache[id];
 }
 
 function renderMaterial(def: Material, w: number, h: number) {
@@ -21,18 +66,19 @@ function renderMaterial(def: Material, w: number, h: number) {
   var iData = ctx.getImageData(0, 0, w, h);
   var data = iData.data;
 
-  // TODO: when things get eval'd for the first time, calculate their whole buffer and save it. it's faster.
-  // var nodeCache: { [s: string]: Float32Array } = {};
+  var renderContext: RenderContext = { nodeCache: {}, w, h, mat: def }
 
   var root = def.nodes.root;
 
-  for (var y = 0; y < h; y++) {
-    for (var x = 0; x < w; x++) {
+  var output = root.func("root", renderContext);
+
+  for (var y = 0; y < output.length; y++) {
+    var row = output[y];
+    for (var x = 0; x < row.length; x++) {
       var i = x + y * w;
       var I = i * 4;
 
-
-      var val = root.type(x, y);
+      var val = row[x];
 
       data[I + 0] = val * 255;
       data[I + 1] = val * 255;
@@ -40,7 +86,7 @@ function renderMaterial(def: Material, w: number, h: number) {
       data[I + 3] = 255;
     }
   }
-  
+
 
   ctx.putImageData(iData, 0, 0);
 
@@ -56,7 +102,11 @@ function renderMaterial(def: Material, w: number, h: number) {
 var testMaterial: Material = {
   nodes: {
     root: {
-      type: Noise
+      func: Levels,
+      data: {input: "myNoise"}
+    },
+    myNoise: {
+      func: Noise
     }
   }
 }
