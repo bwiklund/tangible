@@ -1,7 +1,5 @@
-console.log("hi");
-
 interface Material {
-  nodes: {[s: string]: MatNode}
+  nodes: { [s: string]: MatNode }
 }
 
 interface MatNode {
@@ -12,6 +10,34 @@ function Noise(x: number, y: number) {
   return Math.random();
 }
 
+function renderMaterial(def: Material, w: number, h: number) {
+  var canvas = document.createElement("canvas");
+  document.body.appendChild(canvas);
+  canvas.width = w;
+  canvas.height = h;
+  var ctx = canvas.getContext('2d')!;
+  var iData = ctx.getImageData(0, 0, w, h);
+  var data = iData.data;
+
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var i = x + y * w;
+      var I = i * 4;
+      var val = Noise(x, y);
+      data[I + 0] = val * 255;
+      data[I + 1] = val * 255;
+      data[I + 2] = val * 255;
+      data[I + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(iData, 0, 0);
+
+  document.body.appendChild(canvas);
+}
+
+
+
 var testMaterial: Material = {
   nodes: {
     root: {
@@ -19,3 +45,5 @@ var testMaterial: Material = {
     }
   }
 }
+
+renderMaterial(testMaterial, 512, 512);
