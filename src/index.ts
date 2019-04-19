@@ -9,7 +9,7 @@ interface NodeParams {
 
 interface MatNode {
   func: (id: string, renderContext: RenderContext) => number[][]
-  data?: { [s: string]: any }
+  params?: { [s: string]: any }
 }
 
 interface RenderContext {
@@ -19,33 +19,35 @@ interface RenderContext {
   h: number
 }
 
-function Noise(id: string, renderContext: RenderContext) {
-  var output = [];
-  var node = renderContext.mat.nodes[id];
-
-  for (var y = 0; y < renderContext.h; y++) {
+function iterateBuffer(w: number, h: number, func: (x: number, y: number) => number) {
+  var output: number[][] = [];
+  for (var y = 0; y < h; y++) {
     var row: number[] = [];
     output.push(row);
-    for (var x = 0; x < renderContext.w; x++) {
-      row.push(Math.random());
+    for (var x = 0; x < w; x++) {
+      row.push(func(x, y));
     }
   }
   return output;
 }
 
+function Noise(id: string, renderContext: RenderContext) {
+  return iterateBuffer(renderContext.w, renderContext.h, (x, y) => Math.random());
+}
+
 function Levels(id: string, renderContext: RenderContext) {
   var node = renderContext.mat.nodes[id];
 
-  var input = fetchNodeFromContext(node.data.input, renderContext);
-  var output = [];
-  for (var y = 0; y < renderContext.h; y++) {
-    var row: number[] = [];
-    output.push(row);
-    for (var x = 0; x < renderContext.w; x++) {
-      row.push(input[y][x] * 0.1);
-    }
-  }
-  return output;
+  var input = fetchNodeFromContext(node.params.input, renderContext);
+  var { fromLow, fromHigh, toLow, toHigh } = node.params;
+
+  return iterateBuffer(renderContext.w, renderContext.h, (x, y) => {
+    var val = input[y][x];
+    val -= fromLow;
+    val /= (fromHigh - fromLow);
+    val = toLow + val * (toHigh - toLow);
+    return val;
+  })
 }
 
 function fetchNodeFromContext(id: string, renderContext: RenderContext) {
@@ -103,7 +105,13 @@ var testMaterial: Material = {
   nodes: {
     root: {
       func: Levels,
-      data: {input: "myNoise"}
+      params: {
+        input: "myNoise",
+        fromLow: 0,
+        fromHigh: 1,
+        toLow: 0,
+        toHigh: 0.5
+      }
     },
     myNoise: {
       func: Noise
