@@ -7,34 +7,56 @@ interface NodeParams {
   h: number
 }
 
+interface Buffer {
+  data: Float32Array
+  w: number
+  h: number
+}
+
 interface MatNode {
-  func: (id: string, renderContext: RenderContext) => Float32Array
+  func: (id: string, renderContext: RenderContext) => Buffer
   params?: { [s: string]: any }
 }
 
 interface RenderContext {
   mat: Material
-  nodeCache: { [s: string]: Float32Array }
+  nodeCache: { [s: string]: Buffer }
   w: number
   h: number
 }
 
-function getBuff(buff: Float32Array, x: number, y: number) {
-  return buff[x + y * 512]; // FIXME
+function getBuff(buff: Buffer, x: number, y: number) {
+  var w = buff.w;
+  var h = buff.h;
+  var ix = (x % w + w) % w; // wrap
+  var iy = (y % h + h) % h; // wrap
+  return buff.data[ix + iy * 512];
 }
 
-function iterateBuffer(w: number, h: number, func: (x: number, y: number) => number) {
-  var output: Float32Array = new Float32Array(w * h);
+function iterateBuffer(w: number, h: number, func: (x: number, y: number) => number): Buffer {
+  var data: Float32Array = new Float32Array(w * h);
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
-      output[x + y * 512] = func(x, y);
+      data[x + y * 512] = func(x, y);
     }
   }
-  return output;
+  return { data, w, h };
 }
 
 function Noise(id: string, renderContext: RenderContext) {
-  return iterateBuffer(renderContext.w, renderContext.h, (x, y) => Math.random());
+  return iterateBuffer(renderContext.w, renderContext.h, Math.random);
+}
+
+function Emboss(id: string, renderContext: RenderContext) {
+  var node = renderContext.mat.nodes[id];
+
+  var input = fetchNodeFromContext(node.params.input, renderContext);
+
+  return iterateBuffer(renderContext.w, renderContext.h, (x, y) => {
+    var val = getBuff(input, x, y);
+    var offsetVal = getBuff(input, x, y + 1);
+    return 0.5 + 0.5 * (val - offsetVal);
+  })
 }
 
 function Levels(id: string, renderContext: RenderContext) {
@@ -107,11 +129,17 @@ var testMaterial: Material = {
     root: {
       func: Levels,
       params: {
-        input: "myNoise",
+        input: "myEmboss",
         fromLow: 0,
         fromHigh: 1,
         toLow: 0,
-        toHigh: 0.5
+        toHigh: 0.2
+      }
+    },
+    myEmboss: {
+      func: Emboss,
+      params: {
+        input: "myNoise"
       }
     },
     myNoise: {
