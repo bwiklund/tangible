@@ -8,24 +8,26 @@ interface NodeParams {
 }
 
 interface MatNode {
-  func: (id: string, renderContext: RenderContext) => number[][]
+  func: (id: string, renderContext: RenderContext) => Float32Array
   params?: { [s: string]: any }
 }
 
 interface RenderContext {
   mat: Material
-  nodeCache: { [s: string]: number[][] }
+  nodeCache: { [s: string]: Float32Array }
   w: number
   h: number
 }
 
+function getBuff(buff: Float32Array, x: number, y: number) {
+  return buff[x + y * 512]; // FIXME
+}
+
 function iterateBuffer(w: number, h: number, func: (x: number, y: number) => number) {
-  var output: number[][] = [];
+  var output: Float32Array = new Float32Array(w * h);
   for (var y = 0; y < h; y++) {
-    var row: number[] = [];
-    output.push(row);
     for (var x = 0; x < w; x++) {
-      row.push(func(x, y));
+      output[x + y * 512] = func(x, y);
     }
   }
   return output;
@@ -42,7 +44,7 @@ function Levels(id: string, renderContext: RenderContext) {
   var { fromLow, fromHigh, toLow, toHigh } = node.params;
 
   return iterateBuffer(renderContext.w, renderContext.h, (x, y) => {
-    var val = input[y][x];
+    var val = getBuff(input, x, y);
     val -= fromLow;
     val /= (fromHigh - fromLow);
     val = toLow + val * (toHigh - toLow);
@@ -74,13 +76,12 @@ function renderMaterial(def: Material, w: number, h: number) {
 
   var output = root.func("root", renderContext);
 
-  for (var y = 0; y < output.length; y++) {
-    var row = output[y];
-    for (var x = 0; x < row.length; x++) {
+  for (var y = 0; y < 512; y++) {
+    for (var x = 0; x < 512; x++) {
       var i = x + y * w;
       var I = i * 4;
 
-      var val = row[x];
+      var val = getBuff(output, x, y);
 
       data[I + 0] = val * 255;
       data[I + 1] = val * 255;
